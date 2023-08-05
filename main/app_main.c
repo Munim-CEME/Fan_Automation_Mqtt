@@ -40,7 +40,13 @@ static char mqtt_payload[50];
 
 SemaphoreHandle_t got_time_semaphore;
 bool BUSY = 0;
-void Set_Schedule(int seconds);
+
+char OnStatus[5] = "OFF";
+//char CurrentTime[50] = "000" ;
+char ScheduledTime[50] = "Not Set";
+char Current_State[150];
+
+void Set_Schedule(long int seconds);
 
 static void log_error_if_nonzero(const char *message, int error_code)
 {
@@ -103,11 +109,13 @@ static void mqtt_event_handler(void *handler_args, esp_event_base_t base, int32_
         if (strncmp(event->topic, "time_topic", event->topic_len) == 0){
         ESP_LOGI(TAG, "MQTT_EVENT_DATA");
 
-        
+        char received_msg[40];
+        sprintf(received_msg, "%.*s", event->topic_len, event->data);
 
-        int seconds = atoi(event->data);
-
+       long int seconds = atoi(received_msg);
+        printf("Debugging: %d seconds\n", seconds);
         if (seconds == 0 && *event->data != '0'){
+            
             printf("TOPIC=%.*s\r\n", event->topic_len, event->topic);
             printf("DATA=%.*s\r\n", event->data_len, event->data);
         }
@@ -198,11 +206,15 @@ void Current_time(void *paramss){
     while (1) {
         time(&now);
         localtime_r(&now,  &time_info);
-        printf("Current time: %lld\n", now);
+        //printf("Current time: %lld\n", now);
         strftime(mqtt_payload, sizeof(mqtt_payload), "%c",  &time_info);
-        esp_mqtt_client_publish(client, "time_topic", mqtt_payload, 0, 2, 0);
+        sprintf(Current_State, "Current time: %s - Relay Turned on Till: %s - Relay Status: %s\n", mqtt_payload, ScheduledTime, OnStatus);
+        esp_mqtt_client_publish(client, "time_topic", Current_State, 0, 2, 0);
 
-        vTaskDelay(5000 / portTICK_PERIOD_MS);
+        vTaskDelay(3000 / portTICK_PERIOD_MS);
+
+        //TODO:if current time is equal to scheduled time then turn off relay and set Onstatus to off
+        // and set schedule to not set
     }
 
 }
@@ -211,34 +223,38 @@ void Current_time(void *paramss){
 
 void OnConnect(void *params);
 
-void Set_Schedule(int seconds){
+void Set_Schedule(long int seconds){
     if (BUSY)
     {
         esp_mqtt_client_publish(client, "time_topic", "The relay event is already scheduled", 0, 2, 0);
     }
     else{
-        time_t now1;
-                struct tm schedule_time;
-                struct tm current_time;
-                printf("time to be added: %s\n", seconds);
-                time(&now1);
+            time_t now1;
+
+            time(&now1);
+            long int total_seconds = (long int)now1;
+           // printf("current seconds: %d\n", total_seconds );
+            total_seconds += seconds;
+           // printf("seconds to be scheduled: %ld\n ", total_seconds);
+            
+            struct tm *scheduled_time;
+            time_t scheduled_time_t = (time_t)total_seconds;
+
+            scheduled_time = localtime(&scheduled_time_t);
+
+            char formatted_time[50];
+            strftime(formatted_time, sizeof(formatted_time), "%c", scheduled_time);
+            char msg[50];
+            strcpy(ScheduledTime, formatted_time);
+            sprintf(msg,"Scheduled a new time: %s\n", formatted_time);
                 
-                localtime_r(&now1,  &current_time);
+             esp_mqtt_client_publish(client, "time_topic",msg , 0, 2, 0);
 
-                // Calculate scheduled time by adding seconds
-                now1 += seconds;
-                localtime_r(&now1,  &schedule_time);
-                //mktime( &schedule_time);
+             //TODO: Set gpio HIGH
+             strcpy(OnStatus,"ON");
+             BUSY = 1;
+        
 
-                char scheduled_time_str[30];
-                char message[] = " schedule time is: ";
-    
-                strftime(scheduled_time_str, sizeof(scheduled_time_str), "%c", &schedule_time);
-                printf("scheduled time is: %s\n", scheduled_time_str);
-                   strcat(message, scheduled_time_str);
-
-                // Publish the scheduled time back to a topic
-                esp_mqtt_client_publish(client, "scheduled_time_topic", message, 0, 2, 0);
     }
     
 }
