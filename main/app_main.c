@@ -14,6 +14,7 @@
 #include <time.h>
 #include "esp_wifi.h"
 #include "esp_system.h"
+#include "nvs.h"
 #include "nvs_flash.h"
 #include "esp_event.h"
 #include "esp_netif.h"
@@ -31,20 +32,24 @@
 #include "esp_log.h"
 #include "mqtt_client.h"
 #include "esp_sntp.h"
+#include "driver/gpio.h"
 
 static const char *TAG = "MQTT_EXAMPLE";
 
 #define TAG "NTP TIME"
-
+#define BLINK_GPIO 2
+#define NVS_NAMESPACE "my_namespace"
+#define NVS_KEY "long_value"
 static char mqtt_payload[50];
 
 SemaphoreHandle_t got_time_semaphore;
 bool BUSY = 0;
 
 char OnStatus[5] = "OFF";
-//char CurrentTime[50] = "000" ;
 char ScheduledTime[50] = "Not Set";
 char Current_State[150];
+
+long int scheduled_seconds = 0;
 
 void Set_Schedule(long int seconds);
 
@@ -195,7 +200,7 @@ void Time_init(){
 
 void Set_gpio(void *param);
 
-void Current_time(void *paramss){
+void Current_status(void *paramss){
    
 
      xSemaphoreTake(got_time_semaphore, portMAX_DELAY);
@@ -205,13 +210,24 @@ void Current_time(void *paramss){
 
     while (1) {
         time(&now);
+        long int current_seconds = (long int ) now;
         localtime_r(&now,  &time_info);
         //printf("Current time: %lld\n", now);
         strftime(mqtt_payload, sizeof(mqtt_payload), "%c",  &time_info);
         sprintf(Current_State, "Current time: %s - Relay Turned on Till: %s - Relay Status: %s\n", mqtt_payload, ScheduledTime, OnStatus);
         esp_mqtt_client_publish(client, "time_topic", Current_State, 0, 2, 0);
 
-        vTaskDelay(3000 / portTICK_PERIOD_MS);
+        if(current_seconds >= scheduled_seconds) {
+             strcpy(ScheduledTime, "Not set");
+             strcpy(OnStatus,"OFF");
+             BUSY = 0;
+             scheduled_seconds = 0;
+              gpio_set_level(BLINK_GPIO, 0);
+
+        }
+
+
+        vTaskDelay(1000 / portTICK_PERIOD_MS);
 
         //TODO:if current time is equal to scheduled time then turn off relay and set Onstatus to off
         // and set schedule to not set
@@ -221,7 +237,6 @@ void Current_time(void *paramss){
 
 
 
-void OnConnect(void *params);
 
 void Set_Schedule(long int seconds){
     if (BUSY)
@@ -235,6 +250,7 @@ void Set_Schedule(long int seconds){
             long int total_seconds = (long int)now1;
            // printf("current seconds: %d\n", total_seconds );
             total_seconds += seconds;
+            scheduled_seconds = total_seconds;
            // printf("seconds to be scheduled: %ld\n ", total_seconds);
             
             struct tm *scheduled_time;
@@ -251,6 +267,7 @@ void Set_Schedule(long int seconds){
              esp_mqtt_client_publish(client, "time_topic",msg , 0, 2, 0);
 
              //TODO: Set gpio HIGH
+              gpio_set_level(BLINK_GPIO, 1);
              strcpy(OnStatus,"ON");
              BUSY = 1;
         
@@ -267,6 +284,7 @@ void app_main(void)
 
     setenv("TZ", "AEST-10AEDT-11,M10.5.0/02:00:00,M4.1.0/03:00:00", 1);
     tzset();
+    gpio_set_direction(BLINK_GPIO, GPIO_MODE_OUTPUT);
 
     printf("first time print\n");
     print_time();           
@@ -278,7 +296,7 @@ void app_main(void)
 
     Time_init();
     mqtt_app_start();
-    xTaskCreate(Current_time, "time_task", configMINIMAL_STACK_SIZE * 5, NULL, 5, NULL);
+    xTaskCreate(Current_status, "time_task", configMINIMAL_STACK_SIZE * 5, NULL, 5, NULL);
 
     
 }
