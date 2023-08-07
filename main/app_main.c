@@ -1,11 +1,3 @@
-/* MQTT (over TCP) Example
-
-   This example code is in the Public Domain (or CC0 licensed, at your option.)
-
-   Unless required by applicable law or agreed to in writing, this
-   software is distributed on an "AS IS" BASIS, WITHOUT WARRANTIES OR
-   CONDITIONS OF ANY KIND, either express or implied.
-*/
 
 #include <stdio.h>
 #include <stdint.h>
@@ -60,19 +52,6 @@ static void log_error_if_nonzero(const char *message, int error_code)
     }
 }
 
-
-
-
-/*
- * @brief Event handler registered to receive MQTT events
- *
- *  This function is called by the MQTT client event loop.
- *
- * @param handler_args user data registered to the event.
- * @param base Event base for the handler(always MQTT Base in this example).
- * @param event_id The id for the received event.
- * @param event_data The data for the event, esp_mqtt_event_handle_t.
- */
 static void mqtt_event_handler(void *handler_args, esp_event_base_t base, int32_t event_id, void *event_data)
 {
     ESP_LOGD(TAG, "Event dispatched from event loop base=%s, event_id=%d", base, event_id);
@@ -85,14 +64,10 @@ static void mqtt_event_handler(void *handler_args, esp_event_base_t base, int32_
         msg_id = esp_mqtt_client_publish(client, "time_topic", "CONNECTION Established", 0, 2, 0);
         ESP_LOGI(TAG, "sent publish successful, msg_id=%d", msg_id);
 
-        // msg_id = esp_mqtt_client_subscribe(client, "/topic/qos0", 0);
-        // ESP_LOGI(TAG, "sent subscribe successful, msg_id=%d", msg_id);
 
         msg_id = esp_mqtt_client_subscribe(client, "time_topic", 2);
         ESP_LOGI(TAG, "sent subscribe successful, msg_id=%d", msg_id);
 
-        // msg_id = esp_mqtt_client_unsubscribe(client, "my_topic");
-        // ESP_LOGI(TAG, "sent unsubscribe successful, msg_id=%d", msg_id);
         break;
     case MQTT_EVENT_DISCONNECTED:
         ESP_LOGI(TAG, "MQTT_EVENT_DISCONNECTED");
@@ -100,7 +75,6 @@ static void mqtt_event_handler(void *handler_args, esp_event_base_t base, int32_
 
     case MQTT_EVENT_SUBSCRIBED:
         ESP_LOGI(TAG, "MQTT_EVENT_SUBSCRIBED, msg_id=%d", event->msg_id);
-        // msg_id = esp_mqtt_client_publish(client, "/topic/qos0", "data", 0, 0, 0);
         ESP_LOGI(TAG, "sent publish successful, msg_id=%d", msg_id);
         break;
     case MQTT_EVENT_UNSUBSCRIBED:
@@ -162,7 +136,7 @@ static void mqtt_app_start(void)
         .broker.address.uri = CONFIG_BROKER_URL,
     };
      client = esp_mqtt_client_init(&mqtt_cfg);
-    /* The last argument may be used to pass data to the event handler, in this example mqtt_event_handler */
+    
     esp_mqtt_client_register_event(client, ESP_EVENT_ANY_ID, mqtt_event_handler, NULL);
     esp_mqtt_client_start(client);
 }
@@ -208,14 +182,51 @@ void Current_status(void *paramss){
     time_t now;
     struct tm time_info;
 
+    
+
     while (1) {
         time(&now);
         long int current_seconds = (long int ) now;
         localtime_r(&now,  &time_info);
         //printf("Current time: %lld\n", now);
         strftime(mqtt_payload, sizeof(mqtt_payload), "%c",  &time_info);
-        sprintf(Current_State, "Current time: %s - Relay Turned on Till: %s - Relay Status: %s\n", mqtt_payload, ScheduledTime, OnStatus);
-        esp_mqtt_client_publish(client, "time_topic", Current_State, 0, 2, 0);
+        // sprintf(Current_State, "Current time: %s - Relay Turned on Till: %s - Relay Status: %s\n", mqtt_payload, ScheduledTime, OnStatus);
+        // esp_mqtt_client_publish(client, "time_topic", Current_State, 0, 2, 0);
+
+        nvs_handle_t nvs_handle;
+        esp_err_t err;
+        err = nvs_flash_init();
+        if (err != ESP_OK) {
+        printf("NVS Flash init failed\n");
+       
+        }
+
+        err = nvs_open(NVS_NAMESPACE, NVS_READONLY, &nvs_handle);
+        if (err != ESP_OK) {
+        printf("NVS Open failed\n");
+        
+        }
+
+        err = nvs_get_i64(nvs_handle, NVS_KEY, &scheduled_seconds);
+        if (err == ESP_OK) {
+        printf("2.Read value from NVS: %ld\n", scheduled_seconds);
+        } 
+        else if (err == ESP_ERR_NVS_NOT_FOUND) {
+        printf("NVS Key not found\n");
+        } 
+        else {
+        printf("NVS Get failed\n");
+        }
+
+        struct tm *scheduled_time;
+        time_t scheduled_time_t = (time_t)scheduled_seconds;
+
+        scheduled_time = localtime(&scheduled_time_t);
+
+        char formatted_time[50];
+        strftime(formatted_time, sizeof(formatted_time), "%c", scheduled_time);
+
+    
 
         if(current_seconds >= scheduled_seconds) {
              strcpy(ScheduledTime, "Not set");
@@ -225,12 +236,23 @@ void Current_status(void *paramss){
               gpio_set_level(BLINK_GPIO, 0);
 
         }
+        else{
+              gpio_set_level(BLINK_GPIO, 1);
+              strcpy(OnStatus,"ON");
+              strcpy(ScheduledTime, formatted_time);
+             BUSY = 1;
+
+
+        }
+
+        sprintf(Current_State, "Current time: %s - Relay Turned on Till: %s - Relay Status: %s\n", mqtt_payload, ScheduledTime, OnStatus);
+        esp_mqtt_client_publish(client, "time_topic", Current_State, 0, 2, 0);
+        nvs_close(nvs_handle);
 
 
         vTaskDelay(1000 / portTICK_PERIOD_MS);
 
-        //TODO:if current time is equal to scheduled time then turn off relay and set Onstatus to off
-        // and set schedule to not set
+        
     }
 
 }
@@ -244,17 +266,52 @@ void Set_Schedule(long int seconds){
         esp_mqtt_client_publish(client, "time_topic", "The relay event is already scheduled", 0, 2, 0);
     }
     else{
+            nvs_handle_t nvs_handle;
+            esp_err_t err;
+            err = nvs_flash_init();
+            if (err != ESP_OK) {
+                printf("NVS Flash init failed\n");
+                
+             }
+
+
+            err = nvs_open(NVS_NAMESPACE, NVS_READWRITE, &nvs_handle);
+            if (err != ESP_OK) {
+                printf("NVS Open failed\n");
+            
+            }
+
+
             time_t now1;
 
             time(&now1);
             long int total_seconds = (long int)now1;
-           // printf("current seconds: %d\n", total_seconds );
+           
             total_seconds += seconds;
-            scheduled_seconds = total_seconds;
-           // printf("seconds to be scheduled: %ld\n ", total_seconds);
+            err = nvs_set_i64(nvs_handle, NVS_KEY, total_seconds);
+            if (err != ESP_OK) {
+                printf("NVS Set failed\n");
+             }
+
+             err = nvs_commit(nvs_handle);
+             printf((err != ESP_OK) ? "Failed!\n" : "Done\n");
+
+
+             err = nvs_get_i64(nvs_handle, NVS_KEY, &scheduled_seconds);
+            if (err == ESP_OK) {
+                printf("1. Read value from NVS: %ld\n", scheduled_seconds);
+            } 
+            else if (err == ESP_ERR_NVS_NOT_FOUND) {
+                printf("NVS Key not found\n");
+            }
+             else {
+                printf("NVS Get failed\n");
+            }
+            // scheduled_seconds = total_seconds;
+            // printf("seconds to be scheduled: %ld\n ", scheduled_seconds);
             
             struct tm *scheduled_time;
-            time_t scheduled_time_t = (time_t)total_seconds;
+            time_t scheduled_time_t = (time_t)scheduled_seconds;
 
             scheduled_time = localtime(&scheduled_time_t);
 
@@ -264,12 +321,15 @@ void Set_Schedule(long int seconds){
             strcpy(ScheduledTime, formatted_time);
             sprintf(msg,"Scheduled a new time: %s\n", formatted_time);
                 
-             esp_mqtt_client_publish(client, "time_topic",msg , 0, 2, 0);
+            esp_mqtt_client_publish(client, "time_topic",msg , 0, 2, 0);
 
-             //TODO: Set gpio HIGH
-              gpio_set_level(BLINK_GPIO, 1);
-             strcpy(OnStatus,"ON");
-             BUSY = 1;
+             
+            gpio_set_level(BLINK_GPIO, 1);
+            strcpy(OnStatus,"ON");
+            BUSY = 1;
+
+            nvs_close(nvs_handle);
+
         
 
     }
@@ -296,8 +356,8 @@ void app_main(void)
 
     Time_init();
     mqtt_app_start();
-    xTaskCreate(Current_status, "time_task", configMINIMAL_STACK_SIZE * 5, NULL, 5, NULL);
+    xTaskCreate(Current_status, "time_task", configMINIMAL_STACK_SIZE * 7, NULL, 5, NULL);
 
     
 }
-//}
+
