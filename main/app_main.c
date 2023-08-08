@@ -245,8 +245,8 @@ void Current_status(void *paramss){
 
         }
 
-        sprintf(Current_State, "Current time: %s - Relay Turned on Till: %s - Relay Status: %s\n", mqtt_payload, ScheduledTime, OnStatus);
-        esp_mqtt_client_publish(client, "time_topic", Current_State, 0, 2, 0);
+        //sprintf(Current_State, "Current time: %s - Relay Turned on Till: %s - Relay Status: %s\n", mqtt_payload, ScheduledTime, OnStatus);
+        //esp_mqtt_client_publish(client, "time_topic", Current_State, 0, 2, 0);
         nvs_close(nvs_handle);
 
 
@@ -261,6 +261,45 @@ void Current_status(void *paramss){
 
 
 void Set_Schedule(long int seconds){
+    /*
+        get current seconds
+        compare current seconds with received seconds
+        if currents seconds are >= to receive seconds then publish message that event can not be scheduled
+        else compare received seconds with scheduled seconds
+        if scheduled seconds are >= to receive seconds then publish message that event can not be 
+        scheduled as received seconds are beheind schedule
+        else overwrite scheduled seconds and publish message that new schedule is received seconds
+    */
+            nvs_handle_t nvs_handle;
+            esp_err_t err;
+            err = nvs_flash_init();
+            if (err != ESP_OK) {
+                printf("NVS Flash init failed\n");
+                }
+
+
+            err = nvs_open(NVS_NAMESPACE, NVS_READWRITE, &nvs_handle);
+            if (err != ESP_OK) {
+                printf("NVS Open failed\n");
+            }
+
+             time_t now1;
+              time(&now1);
+            long int current_seconds = (long int)now1;
+
+            if(current_seconds >= seconds) {
+                char msg[] = "Invalid time entry: Behind current time";
+                esp_mqtt_client_publish(client, "time_topic",msg , 0, 2, 0);
+                 }
+            else{
+                
+            }
+
+           
+
+
+
+
     if (BUSY)
     {
         esp_mqtt_client_publish(client, "time_topic", "The relay event is already scheduled", 0, 2, 0);
