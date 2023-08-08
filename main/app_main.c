@@ -229,18 +229,18 @@ void Current_status(void *paramss){
     
 
         if(current_seconds >= scheduled_seconds) {
-             strcpy(ScheduledTime, "Not set");
-             strcpy(OnStatus,"OFF");
-             BUSY = 0;
-             scheduled_seconds = 0;
+            //  strcpy(ScheduledTime, "Not set");
+            //  strcpy(OnStatus,"OFF");
+            //  BUSY = 0;
+            //  scheduled_seconds = 0;
               gpio_set_level(BLINK_GPIO, 0);
 
         }
         else{
               gpio_set_level(BLINK_GPIO, 1);
-              strcpy(OnStatus,"ON");
-              strcpy(ScheduledTime, formatted_time);
-             BUSY = 1;
+            //   strcpy(OnStatus,"ON");
+            //   strcpy(ScheduledTime, formatted_time);
+            //  BUSY = 1;
 
 
         }
@@ -288,46 +288,28 @@ void Set_Schedule(long int seconds){
             long int current_seconds = (long int)now1;
 
             if(current_seconds >= seconds) {
-                char msg[] = "Invalid time entry: Behind current time";
+                char msg[] = "Invalid time entry: Behind current time\n";
                 esp_mqtt_client_publish(client, "time_topic",msg , 0, 2, 0);
                  }
             else{
-                
+                err = nvs_get_i64(nvs_handle, NVS_KEY, &scheduled_seconds);
+            if (err == ESP_OK) {
+                printf("1. Read value from NVS: %ld\n", scheduled_seconds);
+            } 
+            else if (err == ESP_ERR_NVS_NOT_FOUND) {
+                printf("NVS Key not found\n");
+            }
+             else {
+                printf("NVS Get failed\n");
             }
 
-           
-
-
-
-
-    if (BUSY)
-    {
-        esp_mqtt_client_publish(client, "time_topic", "The relay event is already scheduled", 0, 2, 0);
-    }
-    else{
-            nvs_handle_t nvs_handle;
-            esp_err_t err;
-            err = nvs_flash_init();
-            if (err != ESP_OK) {
-                printf("NVS Flash init failed\n");
+            if(scheduled_seconds >= seconds) {
+                char msg[] = "Invalid time entry: Behind scheduled time\n" ;
+                esp_mqtt_client_publish(client, "time_topic",msg , 0, 2, 0);
                 
-             }
-
-
-            err = nvs_open(NVS_NAMESPACE, NVS_READWRITE, &nvs_handle);
-            if (err != ESP_OK) {
-                printf("NVS Open failed\n");
-            
             }
-
-
-            time_t now1;
-
-            time(&now1);
-            long int total_seconds = (long int)now1;
-           
-            total_seconds += seconds;
-            err = nvs_set_i64(nvs_handle, NVS_KEY, total_seconds);
+            else{
+                 err = nvs_set_i64(nvs_handle, NVS_KEY, seconds);
             if (err != ESP_OK) {
                 printf("NVS Set failed\n");
              }
@@ -346,9 +328,7 @@ void Set_Schedule(long int seconds){
              else {
                 printf("NVS Get failed\n");
             }
-            // scheduled_seconds = total_seconds;
-            // printf("seconds to be scheduled: %ld\n ", scheduled_seconds);
-            
+
             struct tm *scheduled_time;
             time_t scheduled_time_t = (time_t)scheduled_seconds;
 
@@ -364,14 +344,92 @@ void Set_Schedule(long int seconds){
 
              
             gpio_set_level(BLINK_GPIO, 1);
-            strcpy(OnStatus,"ON");
-            BUSY = 1;
+            // strcpy(OnStatus,"ON");
+            // BUSY = 1;
 
-            nvs_close(nvs_handle);
+
+            }
+
+
+            }
+
+           
+             nvs_close(nvs_handle);
+
+
+
+    // if (BUSY)
+    // {
+    //     esp_mqtt_client_publish(client, "time_topic", "The relay event is already scheduled", 0, 2, 0);
+    // }
+    // else{
+    //         nvs_handle_t nvs_handle;
+    //         esp_err_t err;
+    //         err = nvs_flash_init();
+    //         if (err != ESP_OK) {
+    //             printf("NVS Flash init failed\n");
+                
+    //          }
+
+
+    //         err = nvs_open(NVS_NAMESPACE, NVS_READWRITE, &nvs_handle);
+    //         if (err != ESP_OK) {
+    //             printf("NVS Open failed\n");
+            
+    //         }
+
+
+    //         time_t now1;
+
+    //         time(&now1);
+    //         long int total_seconds = (long int)now1;
+           
+    //         total_seconds += seconds;
+    //         err = nvs_set_i64(nvs_handle, NVS_KEY, total_seconds);
+    //         if (err != ESP_OK) {
+    //             printf("NVS Set failed\n");
+    //          }
+
+    //          err = nvs_commit(nvs_handle);
+    //          printf((err != ESP_OK) ? "Failed!\n" : "Done\n");
+
+
+    //          err = nvs_get_i64(nvs_handle, NVS_KEY, &scheduled_seconds);
+    //         if (err == ESP_OK) {
+    //             printf("1. Read value from NVS: %ld\n", scheduled_seconds);
+    //         } 
+    //         else if (err == ESP_ERR_NVS_NOT_FOUND) {
+    //             printf("NVS Key not found\n");
+    //         }
+    //          else {
+    //             printf("NVS Get failed\n");
+    //         }
+    //         // scheduled_seconds = total_seconds;
+    //         // printf("seconds to be scheduled: %ld\n ", scheduled_seconds);
+            
+    //         struct tm *scheduled_time;
+    //         time_t scheduled_time_t = (time_t)scheduled_seconds;
+
+    //         scheduled_time = localtime(&scheduled_time_t);
+
+    //         char formatted_time[50];
+    //         strftime(formatted_time, sizeof(formatted_time), "%c", scheduled_time);
+    //         char msg[50];
+    //         strcpy(ScheduledTime, formatted_time);
+    //         sprintf(msg,"Scheduled a new time: %s\n", formatted_time);
+                
+    //         esp_mqtt_client_publish(client, "time_topic",msg , 0, 2, 0);
+
+             
+    //         gpio_set_level(BLINK_GPIO, 1);
+    //         strcpy(OnStatus,"ON");
+    //         BUSY = 1;
+
+    //         nvs_close(nvs_handle);
 
         
 
-    }
+    // }
     
 }
 
