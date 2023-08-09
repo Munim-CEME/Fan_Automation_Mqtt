@@ -1,30 +1,39 @@
-| Supported Targets | ESP32 | ESP32-C3 | ESP32-S2 | ESP32-S3 |
-| ----------------- | ----- | -------- | -------- | -------- |
+| Supported Targets | ESP32 | 
+| ----------------- | ----- | 
 
-# ESP-MQTT sample application
-(See the README.md file in the upper level 'examples' directory for more information about examples.)
+# ESP-I/O-Control-Device
 
-This example connects to the broker URI selected using `idf.py menuconfig` (using mqtt tcp transport) and as a demonstration subscribes/unsubscribes and send a message on certain topic.
-(Please note that the public broker is maintained by the community so may not be always available, for details please see this [disclaimer](https://iot.eclipse.org/getting-started/#sandboxes))
+This project schedules ON time of a Relay(GPIO) connecting to the broker URI selected using `idf.py menuconfig` (using mqtt tcp transport) 
 
-Note: If the URI equals `FROM_STDIN` then the broker address is read from stdin upon application startup (used for testing)
 
-It uses ESP-MQTT library which implements mqtt client to connect to mqtt broker.
+It uses ESP-MQTT library which implements mqtt client to connect to mqtt broker. Furthermore, it uses ntp library to get current time for it's proper functioning. Also ESP32 non-volatile is also used to store the schedule in case connection is disconnected.
 
-## How to use example
+## How to use this project
 
+### Software Required
+* Visual Studio Code IDE [link](https://code.visualstudio.com/download)
+* ESP-IDF version 5.0.2 [link](https://dl.espressif.com/dl/esp-idf/)
+* Latest version of Mosquitto [link](https://mosquitto.org/download/)
 ### Hardware Required
-
-This example can be executed on any ESP32 board, the only required interface is WiFi and connection to internet.
+* ESP-32 DEVKITV1 development board
+* A Relay module
+* If you don't have a relay module then make a circuit using the following schematic:
+![Relay schmatic](image_720.png)
+* 2 female to female jumper wires
 
 ### Configure the project
 
 * Open the project configuration menu (`idf.py menuconfig`)
-* Configure Wi-Fi or Ethernet under "Example Connection Configuration" menu. See "Establishing Wi-Fi or Ethernet Connection" section in [examples/protocols/README.md](../../README.md) for more details.
+* Configure Wi-Fi or Ethernet under "Example Connection Configuration" menu. Under the `SSID` enter the name ofd your Wi-Fi and under the `PASSWORD` section under password of your WiFi network.
+* In the `KConfig.projbuild` file enter the URL of the broker you want to use. Default is `mqtt://mqtt.eclipseprojects.io`
 
 ### Build and Flash
 
-Build the project and flash it to the board, then run monitor tool to view serial output:
+Build the project using:
+```
+idf.py build
+```
+ Then flash it to the board, then run monitor tool to view serial output:
 
 ```
 idf.py -p PORT flash monitor
@@ -32,30 +41,14 @@ idf.py -p PORT flash monitor
 
 (To exit the serial monitor, type ``Ctrl-]``.)
 
-See the Getting Started Guide for full steps to configure and use ESP-IDF to build projects.
+### Publishing and Subscribing to the broker
+* Using the Command Prompt Navigate to the folder where you have installed Mosquitto broker
 
-## Example Output
-
+* To subscribe to the topic enter the command:
 ```
-I (3714) event: sta ip: 192.168.0.139, mask: 255.255.255.0, gw: 192.168.0.2
-I (3714) system_api: Base MAC address is not set, read default base MAC address from BLK0 of EFUSE
-I (3964) MQTT_CLIENT: Sending MQTT CONNECT message, type: 1, id: 0000
-I (4164) MQTT_EXAMPLE: MQTT_EVENT_CONNECTED
-I (4174) MQTT_EXAMPLE: sent publish successful, msg_id=41464
-I (4174) MQTT_EXAMPLE: sent subscribe successful, msg_id=17886
-I (4174) MQTT_EXAMPLE: sent subscribe successful, msg_id=42970
-I (4184) MQTT_EXAMPLE: sent unsubscribe successful, msg_id=50241
-I (4314) MQTT_EXAMPLE: MQTT_EVENT_PUBLISHED, msg_id=41464
-I (4484) MQTT_EXAMPLE: MQTT_EVENT_SUBSCRIBED, msg_id=17886
-I (4484) MQTT_EXAMPLE: sent publish successful, msg_id=0
-I (4684) MQTT_EXAMPLE: MQTT_EVENT_SUBSCRIBED, msg_id=42970
-I (4684) MQTT_EXAMPLE: sent publish successful, msg_id=0
-I (4884) MQTT_CLIENT: deliver_publish, message_length_read=19, message_length=19
-I (4884) MQTT_EXAMPLE: MQTT_EVENT_DATA
-TOPIC=/topic/qos0
-DATA=data
-I (5194) MQTT_CLIENT: deliver_publish, message_length_read=19, message_length=19
-I (5194) MQTT_EXAMPLE: MQTT_EVENT_DATA
-TOPIC=/topic/qos0
-DATA=data
+mosquitto_sub -h mqtt.eclipseprojects.io -t time_topic
+```
+* To Publish an epoch time to the topic enter command:
+```
+mosquitto_pub -h mqtt.eclipseprojects.io -t time_topic -m EPOCH time
 ```
