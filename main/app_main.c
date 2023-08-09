@@ -35,7 +35,7 @@ static const char *TAG = "MQTT_EXAMPLE";
 static char mqtt_payload[50];
 
 SemaphoreHandle_t got_time_semaphore;
-bool BUSY = 0;
+char check = -1;
 
 char OnStatus[5] = "OFF";
 char ScheduledTime[50] = "Not Set";
@@ -229,24 +229,24 @@ void Current_status(void *paramss){
     
 
         if(current_seconds >= scheduled_seconds) {
-            //  strcpy(ScheduledTime, "Not set");
-            //  strcpy(OnStatus,"OFF");
-            //  BUSY = 0;
-            //  scheduled_seconds = 0;
+
               gpio_set_level(BLINK_GPIO, 0);
+                if(check == 1){
+                char newstatus[] = "Relay OFF";
+                esp_mqtt_client_publish(client, "time_topic",newstatus , 0, 2, 0);
+                printf("code is here\n");
+                check = 0;
+                }
+              
 
         }
         else{
               gpio_set_level(BLINK_GPIO, 1);
-            //   strcpy(OnStatus,"ON");
-            //   strcpy(ScheduledTime, formatted_time);
-            //  BUSY = 1;
 
 
         }
 
-        //sprintf(Current_State, "Current time: %s - Relay Turned on Till: %s - Relay Status: %s\n", mqtt_payload, ScheduledTime, OnStatus);
-        //esp_mqtt_client_publish(client, "time_topic", Current_State, 0, 2, 0);
+
         nvs_close(nvs_handle);
 
 
@@ -344,8 +344,9 @@ void Set_Schedule(long int seconds){
 
              
             gpio_set_level(BLINK_GPIO, 1);
-            // strcpy(OnStatus,"ON");
-            // BUSY = 1;
+            char status[] = "Relay ON";
+            esp_mqtt_client_publish(client, "time_topic",status , 0, 2, 0);
+            check = 1;
 
 
             }
