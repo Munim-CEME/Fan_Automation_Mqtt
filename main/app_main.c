@@ -440,7 +440,7 @@ void app_main(void)
 {
      got_time_semaphore = xSemaphoreCreateBinary();
 
-    setenv("TZ", "AEST-10AEDT-11,M10.5.0/02:00:00,M4.1.0/03:00:00", 1);
+    setenv("TZ", "UTC-05", 1);
     tzset();
     gpio_set_direction(BLINK_GPIO, GPIO_MODE_OUTPUT);
 
