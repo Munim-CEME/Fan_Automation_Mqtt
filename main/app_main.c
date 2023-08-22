@@ -168,7 +168,7 @@ void Time_init(){
     esp_sntp_init();
     esp_sntp_set_sync_mode(SNTP_SYNC_MODE_IMMED);
     esp_sntp_setservername(0, "pool.ntp.org");
-     esp_sntp_set_time_sync_notification_cb(on_got_time);
+    esp_sntp_set_time_sync_notification_cb(on_got_time);
 
 }
 
@@ -232,8 +232,8 @@ void Current_status(void *paramss){
 
               gpio_set_level(BLINK_GPIO, 0);
                 if(check == 1){
-                char newstatus[] = "Relay OFF";
-                esp_mqtt_client_publish(client, "time_topic",newstatus , 0, 2, 0);
+                char newstatus[] = "OFF";
+                esp_mqtt_client_publish(client, "time_topic",newstatus , 0, 1, 0);
                 printf("code is here\n");
                 check = 0;
                 }
@@ -340,12 +340,14 @@ void Set_Schedule(long int seconds){
             strcpy(ScheduledTime, formatted_time);
             sprintf(msg,"Scheduled a new time: %s\n", formatted_time);
                 
-            esp_mqtt_client_publish(client, "time_topic",msg , 0, 2, 0);
+            esp_mqtt_client_publish(client, "time_topic",msg, 0, 2, 0);
 
-             
+             vTaskDelay(500 / portTICK_PERIOD_MS);
             gpio_set_level(BLINK_GPIO, 1);
-            char status[] = "Relay ON";
-            esp_mqtt_client_publish(client, "time_topic",status , 0, 2, 0);
+            
+            char msg1[] = "ON";
+            esp_mqtt_client_enqeue(client,"time_topic",msg1, 0, 1, 0,0);
+            
             check = 1;
 
 
