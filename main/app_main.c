@@ -53,8 +53,10 @@ int l_switch_lvl = -1;
 
 esp_mqtt_client_handle_t client = NULL;
 
+void motor_action();
 void Manual_mode();
-
+void Auto_mode(int mode);
+void Mode_0();
 void Set_Schedule(long int seconds);
 static void log_error_if_nonzero(const char *message, int error_code);
 static void mqtt_event_handler(void *handler_args, esp_event_base_t base, int32_t event_id, void *event_data);
@@ -272,6 +274,7 @@ void Current_status(void *paramss)
         {
 
             gpio_set_level(BLINK_GPIO, 0);
+            Mode_0();
             if (check == 1)
             {
                 char newstatus[] = "OFF";
@@ -386,6 +389,7 @@ void Set_Schedule(long int seconds)
 
             vTaskDelay(500 / portTICK_PERIOD_MS);
             gpio_set_level(BLINK_GPIO, 1);
+            Auto_mode( 1);
             check = 1;
         }
     }
@@ -419,6 +423,26 @@ void GPIO_def()
     gpio_config(&l_switch);
 }
 
+void motor_action()
+{
+    int previous_state = gpio_get_level(L_SWITCH);
+    while (1)
+    {
+        gpio_set_level(OUTPUT, 1);
+        int current_state = gpio_get_level(L_SWITCH);
+
+        if (current_state == 1 && previous_state == 0)
+        {
+            vTaskDelay(1500 / portTICK_PERIOD_MS);
+            gpio_set_level(OUTPUT, 0);
+            current_state = gpio_get_level(L_SWITCH);
+            previous_state = current_state;
+            break;
+        }
+        previous_state = current_state;
+    }
+}
+
 void Manual_mode()
 {
     int previous_state = gpio_get_level(L_SWITCH);
@@ -450,5 +474,41 @@ void Manual_mode()
     if (counter > 2)
     {
         counter = 0;
+    }
+}
+
+void Auto_mode(int mode)
+{
+    while (1)
+    {
+        if (counter == mode)
+        {
+            break;
+        }
+        motor_action();
+
+        counter++;
+        if (counter > 2)
+        {
+            counter = 0;
+        }
+    }
+}
+
+void Mode_0()
+{
+    while (1)
+    {
+        if (counter == 0)
+        {
+            break;
+        }
+        motor_action();
+
+        counter++;
+        if (counter > 2)
+        {
+            counter = 0;
+        }
     }
 }
