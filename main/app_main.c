@@ -73,6 +73,7 @@ void app_main(void)
 
     setenv("TZ", "UTC-05", 1);
     tzset();
+    GPIO_def();
     gpio_set_direction(BLINK_GPIO, GPIO_MODE_OUTPUT);
 
     printf("first time print\n");
